@@ -28,6 +28,12 @@ public class Post extends PanacheEntity {
     @Column
     public String workflowInstanceId;
 
+    @Column
+    public Boolean aiApproved;
+
+    @Column(columnDefinition = "TEXT")
+    public String aiReason;
+
     public static Post create(String author, String content) {
         Post post = new Post();
         post.author = author;

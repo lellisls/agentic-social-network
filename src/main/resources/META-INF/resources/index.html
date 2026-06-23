@@ -14,6 +14,16 @@
     button:disabled { opacity: 0.4; cursor: default; }
     .btn-approve { background: #2ecc71; color: #fff; border: none; border-radius: 4px; }
     .btn-reject  { background: #e74c3c; color: #fff; border: none; border-radius: 4px; }
+    .review-row { display: flex; gap: 1rem; align-items: flex-start; }
+    .review-row .message { flex: 1; }
+    .ai-opinion { flex: 0 0 240px; font-size: 0.85rem; border-left: 3px solid #ccc; padding: 0.5rem 0.75rem; background: #fafafa; border-radius: 0 4px 4px 0; }
+    .ai-opinion.approved { border-left-color: #2ecc71; }
+    .ai-opinion.rejected { border-left-color: #e74c3c; }
+    .ai-opinion .verdict { font-weight: bold; margin-bottom: 0.25rem; }
+    .ai-opinion.approved .verdict { color: #27ae60; }
+    .ai-opinion.rejected .verdict { color: #c0392b; }
+    .ai-opinion .reason { color: #555; }
+    .ai-opinion .pending { color: #999; font-style: italic; }
     form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #ccc; }
     input, textarea { padding: 0.4rem; font-size: 1rem; font-family: inherit; }
     textarea { resize: vertical; min-height: 80px; }
@@ -55,6 +65,20 @@
       );
     }
 
+    function AiOpinion({ post }) {
+      if (post.aiApproved == null) {
+        return h('div', { className: 'ai-opinion' },
+          h('div', { className: 'verdict' }, '🤖 AI Review'),
+          h('div', { className: 'pending' }, 'Awaiting AI opinion…')
+        );
+      }
+      const cls = post.aiApproved ? 'approved' : 'rejected';
+      return h('div', { className: `ai-opinion ${cls}` },
+        h('div', { className: 'verdict' }, post.aiApproved ? '🤖 ✓ AI Approved' : '🤖 ✗ AI Flagged'),
+        post.aiReason && h('div', { className: 'reason' }, post.aiReason)
+      );
+    }
+
     function ModerationQueue({ refresh, onAction }) {
       const [pending, setPending] = useState([]);
 
@@ -85,11 +109,16 @@
           ? h('p', { style: { color: '#999' } }, 'Nothing pending human review.')
           : pending.map(p =>
               h('div', { className: 'post', key: p.id },
-                h('div', { className: 'meta' }, h('strong', null, p.author), ` · ${new Date(p.timestamp).toLocaleString()}`),
-                h('div', null, p.content),
-                h('div', { className: 'controls' },
-                  h('button', { className: 'btn-approve', onClick: () => decide(p.id, true) }, '✓ Approve'),
-                  h('button', { className: 'btn-reject',  onClick: () => decide(p.id, false) }, '✗ Reject')
+                h('div', { className: 'review-row' },
+                  h('div', { className: 'message' },
+                    h('div', { className: 'meta' }, h('strong', null, p.author), ` · ${new Date(p.timestamp).toLocaleString()}`),
+                    h('div', null, p.content),
+                    h('div', { className: 'controls' },
+                      h('button', { className: 'btn-approve', onClick: () => decide(p.id, true) }, '✓ Approve'),
+                      h('button', { className: 'btn-reject',  onClick: () => decide(p.id, false) }, '✗ Reject')
+                    )
+                  ),
+                  h(AiOpinion, { post: p })
                 )
               )
             )

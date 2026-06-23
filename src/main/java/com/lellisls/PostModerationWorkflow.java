@@ -97,12 +97,22 @@ public class PostModerationWorkflow extends Flow {
 
     @Transactional
     void markRejected(ModerationContext ctx) {
-        updateStatus(ctx.postId(), Post.Status.REJECTED);
+        Post post = Post.findById(ctx.postId());
+        if (post != null) {
+            post.status = Post.Status.REJECTED;
+            post.aiApproved = ctx.approved();
+            post.aiReason = ctx.reason();
+        }
     }
 
     @Transactional
     void markPendingHuman(ModerationContext ctx) {
-        updateStatus(ctx.postId(), Post.Status.PENDING_HUMAN);
+        Post post = Post.findById(ctx.postId());
+        if (post != null) {
+            post.status = Post.Status.PENDING_HUMAN;
+            post.aiApproved = ctx.approved();
+            post.aiReason = ctx.reason();
+        }
     }
 
     @Transactional

@@ -11,7 +11,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 @ApplicationScoped
 @SystemMessage("""
         You are a content moderator for a social network.
-        Evaluate whether a post is appropriate (no hate speech, spam, or illegal content).
+        A post is appropriate UNLESS it clearly contains hate speech, harassment,
+        spam, or illegal content. Normal everyday posts must be approved.
+        Default to approving when in doubt.
+
+        Respond with a JSON object containing exactly two fields:
+        - "approved": boolean — true if the post is appropriate, false otherwise.
+        - "reason": string — a short explanation for your decision. Always provide
+          a reason, whether the post is approved or rejected.
         """)
 public interface PostModerationAgent {
 
