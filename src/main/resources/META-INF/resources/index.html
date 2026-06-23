@@ -5,12 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Social Network</title>
   <style>
-    body { font-family: sans-serif; max-width: 640px; margin: 2rem auto; padding: 0 1rem; }
+    body { font-family: sans-serif; max-width: 720px; margin: 2rem auto; padding: 0 1rem; }
+    h2 { border-bottom: 1px solid #ccc; padding-bottom: 0.3rem; }
     .post { border-bottom: 1px solid #eee; padding: 0.75rem 0; }
     .meta { font-size: 0.8rem; color: #888; margin-bottom: 0.25rem; }
     .controls { margin-top: 1rem; display: flex; gap: 0.5rem; align-items: center; }
     button { cursor: pointer; padding: 0.4rem 0.8rem; }
     button:disabled { opacity: 0.4; cursor: default; }
+    .btn-approve { background: #2ecc71; color: #fff; border: none; border-radius: 4px; }
+    .btn-reject  { background: #e74c3c; color: #fff; border: none; border-radius: 4px; }
     form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #ccc; }
     input, textarea { padding: 0.4rem; font-size: 1rem; font-family: inherit; }
     textarea { resize: vertical; min-height: 80px; }
@@ -18,7 +21,6 @@
 </head>
 <body>
   <div id="root"></div>
-
   <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
   <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script>
@@ -28,6 +30,7 @@
     function NewPostForm({ onCreated }) {
       const [author, setAuthor]   = useState('');
       const [content, setContent] = useState('');
+      const [msg, setMsg]         = useState('');
 
       function submit(e) {
         e.preventDefault();
@@ -36,48 +39,101 @@
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ author, content })
         }).then(r => {
-          if (r.ok) { setAuthor(''); setContent(''); onCreated(); }
+          if (r.ok) {
+            setAuthor(''); setContent('');
+            setMsg('Post submitted — awaiting AI + human review.');
+            onCreated();
+          }
         });
       }
 
       return h('form', { onSubmit: submit },
-        h('input',    { placeholder: 'Your name', value: author,  onChange: e => setAuthor(e.target.value),  required: true }),
-        h('textarea', { placeholder: 'What\'s on your mind?', value: content, onChange: e => setContent(e.target.value), required: true }),
-        h('button',   { type: 'submit' }, 'Post')
+        h('input',    { placeholder: 'Your name', value: author, onChange: e => setAuthor(e.target.value), required: true }),
+        h('textarea', { placeholder: "What's on your mind?", value: content, onChange: e => setContent(e.target.value), required: true }),
+        h('button',   { type: 'submit' }, 'Post'),
+        msg && h('small', { style: { color: '#27ae60' } }, msg)
       );
     }
 
-    function App() {
+    function ModerationQueue({ refresh, onAction }) {
+      const [pending, setPending] = useState([]);
+
+      function load() {
+        fetch('/posts/pending')
+          .then(r => r.ok ? r.json() : Promise.reject(r))
+          .then(setPending)
+          .catch(() => setPending([]));
+      }
+
+      useEffect(() => { load(); }, [refresh]);
+      useEffect(() => {
+        const timer = setInterval(load, 2000);
+        return () => clearInterval(timer);
+      }, []);
+
+      function decide(id, approved) {
+        fetch(`/posts/${id}/moderate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ approved })
+        }).then(() => { load(); onAction(); });
+      }
+
+      return h('div', null,
+        h('h2', null, `Moderation Queue (${pending.length})`),
+        pending.length === 0
+          ? h('p', { style: { color: '#999' } }, 'Nothing pending human review.')
+          : pending.map(p =>
+              h('div', { className: 'post', key: p.id },
+                h('div', { className: 'meta' }, h('strong', null, p.author), ` · ${new Date(p.timestamp).toLocaleString()}`),
+                h('div', null, p.content),
+                h('div', { className: 'controls' },
+                  h('button', { className: 'btn-approve', onClick: () => decide(p.id, true) }, '✓ Approve'),
+                  h('button', { className: 'btn-reject',  onClick: () => decide(p.id, false) }, '✗ Reject')
+                )
+              )
+            )
+      );
+    }
+
+    function Feed({ refresh }) {
       const [posts, setPosts]     = useState([]);
       const [page, setPage]       = useState(0);
       const [hasMore, setHasMore] = useState(true);
 
-      function load(p) {
-        fetch(`/posts?page=${p}&size=${PAGE_SIZE}`)
+      useEffect(() => {
+        fetch(`/posts?page=${page}&size=${PAGE_SIZE}`)
           .then(r => r.json())
           .then(data => { setPosts(data); setHasMore(data.length === PAGE_SIZE); });
-      }
-
-      useEffect(() => { load(page); }, [page]);
-
-      function handleCreated() { setPage(0); load(0); }
+      }, [page, refresh]);
 
       return h('div', null,
-        h('h1', null, 'Posts'),
-        h(NewPostForm, { onCreated: handleCreated }),
-        posts.map(p =>
-          h('div', { className: 'post', key: p.id },
-            h('div', { className: 'meta' },
-              h('strong', null, p.author), ` · ${new Date(p.timestamp).toLocaleString()}`
+        h('h2', null, 'Published Posts'),
+        posts.length === 0
+          ? h('p', { style: { color: '#999' } }, 'No published posts yet.')
+          : posts.map(p =>
+              h('div', { className: 'post', key: p.id },
+                h('div', { className: 'meta' }, h('strong', null, p.author), ` · ${new Date(p.timestamp).toLocaleString()}`),
+                h('div', null, p.content)
+              )
             ),
-            h('div', null, p.content)
-          )
-        ),
         h('div', { className: 'controls' },
           h('button', { onClick: () => setPage(p => p - 1), disabled: page === 0 }, '← Prev'),
           h('span', null, `Page ${page + 1}`),
           h('button', { onClick: () => setPage(p => p + 1), disabled: !hasMore }, 'Next →')
         )
+      );
+    }
+
+    function App() {
+      const [tick, setTick] = useState(0);
+      const refresh = () => setTick(t => t + 1);
+
+      return h('div', null,
+        h('h1', null, 'Social Network'),
+        h(NewPostForm, { onCreated: refresh }),
+        h(ModerationQueue, { refresh: tick, onAction: refresh }),
+        h(Feed, { refresh: tick })
       );
     }
 
