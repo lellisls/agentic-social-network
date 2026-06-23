@@ -1,4 +1,4 @@
-package com.lellisls;
+package com.lellisls.moderation;
 
 import dev.langchain4j.service.MemoryId;
 import dev.langchain4j.service.SystemMessage;

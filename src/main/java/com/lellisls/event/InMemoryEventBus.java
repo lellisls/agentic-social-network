@@ -1,4 +1,4 @@
-package com.lellisls;
+package com.lellisls.event;
 
 import io.serverlessworkflow.impl.events.InMemoryEvents;
 import jakarta.enterprise.context.ApplicationScoped;

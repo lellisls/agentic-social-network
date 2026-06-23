@@ -1,4 +1,4 @@
-package com.lellisls;
+package com.lellisls.demo;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

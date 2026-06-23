@@ -1,4 +1,4 @@
-package com.lellisls;
+package com.lellisls.post;
 
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.transaction.Transactional;

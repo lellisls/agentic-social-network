@@ -1,4 +1,4 @@
-package com.lellisls;
+package com.lellisls.demo;
 
 public record Message(String message) {
     public Message() {

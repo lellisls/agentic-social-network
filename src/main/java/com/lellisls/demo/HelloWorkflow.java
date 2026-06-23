@@ -1,4 +1,4 @@
-package com.lellisls;
+package com.lellisls.demo;
 
 import io.quarkiverse.flow.Flow;
 import io.serverlessworkflow.api.types.Workflow;

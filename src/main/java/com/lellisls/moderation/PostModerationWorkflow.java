@@ -1,6 +1,7 @@
-package com.lellisls;
+package com.lellisls.moderation;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lellisls.post.Post;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.CloudEventData;
 import io.quarkiverse.flow.Flow;

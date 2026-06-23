@@ -1,6 +1,8 @@
-package com.lellisls;
+package com.lellisls.post;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.lellisls.event.InMemoryEventBus;
+import com.lellisls.moderation.PostModerationWorkflow;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.core.builder.CloudEventBuilder;
 import io.cloudevents.jackson.JsonCloudEventData;
