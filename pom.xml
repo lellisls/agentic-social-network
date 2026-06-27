@@ -13,7 +13,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
         <quarkus.platform.artifact-id>quarkus-bom</quarkus.platform.artifact-id>
         <quarkus.platform.group-id>io.quarkus.platform</quarkus.platform.group-id>
-        <quarkus.platform.version>3.36.3</quarkus.platform.version>
+        <quarkus.platform.version>3.37.0</quarkus.platform.version>
         <skipITs>true</skipITs>
         <surefire-plugin.version>3.5.6</surefire-plugin.version>
     </properties>
@@ -70,12 +70,20 @@
             <artifactId>quarkus-langchain4j-ollama</artifactId>
         </dependency>
         <dependency>
-            <groupId>io.quarkiverse.flow</groupId>
-            <artifactId>quarkus-flow</artifactId>
+            <groupId>io.quarkiverse.langchain4j</groupId>
+            <artifactId>quarkus-langchain4j-agentic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-agentic</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>dev.langchain4j</groupId>
+            <artifactId>langchain4j-agentic-patterns</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkiverse.flow</groupId>
-            <artifactId>quarkus-flow-langchain4j</artifactId>
+            <artifactId>quarkus-flow</artifactId>
         </dependency>
         <dependency>
             <groupId>io.quarkus</groupId>

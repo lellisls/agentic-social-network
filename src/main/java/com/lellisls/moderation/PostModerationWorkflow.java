@@ -19,7 +19,7 @@ import static io.serverlessworkflow.fluent.func.dsl.FuncDSL.*;
 public class PostModerationWorkflow extends Flow {
 
     @Inject
-    PostModerationAgent moderationAgent;
+    ModerationPanel moderationPanel;
 
     @Inject
     ObjectMapper objectMapper;
@@ -63,10 +63,8 @@ public class PostModerationWorkflow extends Flow {
     public record HumanReviewDecision(long postId, boolean approved) {}
 
     ModerationContext moderate(PostContext ctx) {
-        PostModerationAgent.ModerationResult result = moderationAgent.moderate(
-                Long.toString(ctx.postId()),
-                new PostModerationAgent.PostInput(ctx.author(), ctx.content()));
-        return new ModerationContext(ctx.postId(), result.approved(), result.reason());
+        ModerationPanel.Verdict verdict = moderationPanel.evaluate(ctx.author(), ctx.content());
+        return new ModerationContext(ctx.postId(), verdict.approved(), verdict.reason());
     }
 
     HumanReviewDecision toHumanReviewDecision(Collection<?> events) {
