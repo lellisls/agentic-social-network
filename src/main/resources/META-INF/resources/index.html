@@ -107,10 +107,6 @@
       }
 
       useEffect(() => { load(); }, [refresh]);
-      useEffect(() => {
-        const timer = setInterval(load, 2000);
-        return () => clearInterval(timer);
-      }, []);
 
       function decide(id, approved) {
         fetch(`/posts/${id}/moderate`, {
@@ -154,10 +150,6 @@
       }
 
       useEffect(() => { load(); }, [page, refresh]);
-      useEffect(() => {
-        const t = setInterval(load, 2000);
-        return () => clearInterval(t);
-      }, [page]);
 
       return h('div', null,
         h('h2', null, 'Published Posts'),
@@ -185,17 +177,14 @@
         fetch('/posts/rejected').then(r => r.json()).then(setPosts).catch(() => setPosts([]));
       }
 
-      useEffect(() => { load(); }, [refresh]);
-      useEffect(() => {
-        const t = setInterval(() => { load(); setNow(Date.now()); }, 10000);
-        return () => clearInterval(t);
-      }, []);
+      useEffect(() => { load(); setNow(Date.now()); }, [refresh]);
 
       function canDelete(post) {
-        return (now - new Date(post.timestamp).getTime()) >= 24 * 60 * 60 * 1000;
+        return post.aiApproved === false || (now - new Date(post.timestamp).getTime()) >= 24 * 60 * 60 * 1000;
       }
 
       function timeUntilDeletion(post) {
+        if (post.aiApproved === false) return null;
         const ms = 24 * 60 * 60 * 1000 - (now - new Date(post.timestamp).getTime());
         if (ms <= 0) return null;
         const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
@@ -234,6 +223,18 @@
     function App() {
       const [tick, setTick] = useState(0);
       const refresh = () => setTick(t => t + 1);
+
+      useEffect(() => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/posts/events`;
+        const ws = new WebSocket(wsUrl);
+        ws.onmessage = (event) => {
+          if (event.data === 'refresh') {
+            refresh();
+          }
+        };
+        return () => ws.close();
+      }, []);
 
       return h('div', null,
         h('h1', null, 'Social Network'),

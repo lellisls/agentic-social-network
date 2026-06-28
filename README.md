@@ -86,6 +86,24 @@ Easily start your REST Web Services
 
 ### WebSockets
 
-WebSocket communication channel starter code
+WebSocket communication channel is configured to stream post moderation and deletion events in real time.
 
 [Related guide section...](https://quarkus.io/guides/websockets)
+
+## Application Features & Endpoints
+
+### 1. Posts API
+- **`GET /posts`**: Retrieve published posts (paginated).
+- **`POST /posts`**: Create a new post (starts the AI moderation workflow asynchronously).
+- **`GET /posts/pending`**: Retrieve posts awaiting human review.
+- **`GET /posts/rejected`**: Retrieve rejected/auto-rejected posts.
+- **`POST /posts/{id}/moderate`**: Submit human moderation decision (`{"approved": true/false}`).
+- **`DELETE /posts/{id}`**: Delete a rejected post.
+  - **Auto-rejected posts** (`aiApproved == false`) can be deleted immediately by a human.
+  - **Human-rejected posts** or other rejected posts have a 24-hour retention lock before deletion.
+
+### 2. WebSocket Real-Time Updates
+- **`ws://localhost:8080/posts/events`**: Connect to stream real-time updates. The server sends `refresh` whenever a post is created, moderated, or deleted, allowing the UI to reload content instantaneously.
+
+### 3. Background Services
+- **`RejectedPostCleaner`**: A scheduled background task that automatically deletes posts with status `REJECTED` that are older than 24 hours.

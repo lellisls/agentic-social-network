@@ -25,6 +25,9 @@ public class PostModerationWorkflow extends Flow {
     @Inject
     ObjectMapper objectMapper;
 
+    @Inject
+    jakarta.enterprise.event.Event<com.lellisls.post.PostEvent> postEvent;
+
     @Override
     public Workflow descriptor() {
         return FuncWorkflowBuilder.workflow("post-moderation")
@@ -111,6 +114,7 @@ public class PostModerationWorkflow extends Flow {
             post.aiApproved = true;
             post.aiScore = ctx.score();
             post.aiReason = ctx.reason();
+            postEvent.fire(new com.lellisls.post.PostEvent(ctx.postId()));
         }
     }
 
@@ -122,6 +126,7 @@ public class PostModerationWorkflow extends Flow {
             post.aiApproved = false;
             post.aiScore = ctx.score();
             post.aiReason = ctx.reason();
+            postEvent.fire(new com.lellisls.post.PostEvent(ctx.postId()));
         }
     }
 
@@ -133,12 +138,14 @@ public class PostModerationWorkflow extends Flow {
             post.aiApproved = null;
             post.aiScore = ctx.score();
             post.aiReason = ctx.reason();
+            postEvent.fire(new com.lellisls.post.PostEvent(ctx.postId()));
         }
     }
 
     @Transactional
     void applyHumanDecision(HumanReviewDecision decision) {
         updateStatus(decision.postId(), decision.approved() ? Post.Status.PUBLISHED : Post.Status.REJECTED);
+        postEvent.fire(new com.lellisls.post.PostEvent(decision.postId()));
     }
 
     private void updateStatus(long postId, Post.Status status) {
