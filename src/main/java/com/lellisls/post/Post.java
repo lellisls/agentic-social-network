@@ -31,6 +31,9 @@ public class Post extends PanacheEntity {
     @Column
     public Boolean aiApproved;
 
+    @Column
+    public Double aiScore;
+
     @Column(columnDefinition = "TEXT")
     public String aiReason;
 

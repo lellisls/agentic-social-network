@@ -19,11 +19,19 @@
     .ai-opinion { flex: 0 0 240px; font-size: 0.85rem; border-left: 3px solid #ccc; padding: 0.5rem 0.75rem; background: #fafafa; border-radius: 0 4px 4px 0; }
     .ai-opinion.approved { border-left-color: #2ecc71; }
     .ai-opinion.rejected { border-left-color: #e74c3c; }
-    .ai-opinion .verdict { font-weight: bold; margin-bottom: 0.25rem; }
-    .ai-opinion.approved .verdict { color: #27ae60; }
-    .ai-opinion.rejected .verdict { color: #c0392b; }
+    .ai-opinion.pending-human { border-left-color: #f39c12; }
+    .ai-opinion .score { font-size: 1.1rem; font-weight: bold; margin-bottom: 0.2rem; }
+    .score-bar-wrap { background: #e0e0e0; border-radius: 4px; height: 6px; margin: 0.3rem 0; }
+    .score-bar { height: 6px; border-radius: 4px; background: #2ecc71; transition: width 0.3s; }
+    .ai-opinion.rejected .score-bar { background: #e74c3c; }
+    .ai-opinion.approved .score { color: #27ae60; }
+    .ai-opinion.rejected .score { color: #c0392b; }
     .ai-opinion .reason { color: #555; }
     .ai-opinion .pending { color: #999; font-style: italic; }
+    .btn-delete { background: #c0392b; color: #fff; border: none; border-radius: 4px; font-size: 0.8rem; }
+    .rejected-post { border-bottom: 1px solid #eee; padding: 0.75rem 0; }
+    .rejected-post .content { color: #555; margin: 0.25rem 0; }
+    .delete-hint { font-size: 0.75rem; color: #aaa; margin-left: 0.5rem; }
     form { display: flex; flex-direction: column; gap: 0.5rem; margin-bottom: 1.5rem; padding-bottom: 1.5rem; border-bottom: 2px solid #ccc; }
     input, textarea { padding: 0.4rem; font-size: 1rem; font-family: inherit; }
     textarea { resize: vertical; min-height: 80px; }
@@ -66,15 +74,24 @@
     }
 
     function AiOpinion({ post }) {
-      if (post.aiApproved == null) {
+      if (post.aiScore == null) {
         return h('div', { className: 'ai-opinion' },
           h('div', { className: 'verdict' }, '🤖 AI Review'),
           h('div', { className: 'pending' }, 'Awaiting AI opinion…')
         );
       }
-      const cls = post.aiApproved ? 'approved' : 'rejected';
+      const cls = post.aiApproved === true ? 'approved' : post.aiApproved === false ? 'rejected' : 'pending-human';
+      const label = post.aiApproved === true ? '🤖 ✓ AI Approved'
+                  : post.aiApproved === false ? '🤖 ✗ AI Flagged'
+                  : '🤖 ⚠ Needs Human Review';
       return h('div', { className: `ai-opinion ${cls}` },
-        h('div', { className: 'verdict' }, post.aiApproved ? '🤖 ✓ AI Approved' : '🤖 ✗ AI Flagged'),
+        h('div', { className: 'verdict' }, label),
+        h('div', null,
+          h('div', { className: 'score' }, `Risk score: ${post.aiScore.toFixed(1)} / 100`),
+          h('div', { className: 'score-bar-wrap' },
+            h('div', { className: 'score-bar', style: { width: `${post.aiScore}%` } })
+          )
+        ),
         post.aiReason && h('div', { className: 'reason' }, post.aiReason)
       );
     }
@@ -130,11 +147,17 @@
       const [page, setPage]       = useState(0);
       const [hasMore, setHasMore] = useState(true);
 
-      useEffect(() => {
+      function load() {
         fetch(`/posts?page=${page}&size=${PAGE_SIZE}`)
           .then(r => r.json())
           .then(data => { setPosts(data); setHasMore(data.length === PAGE_SIZE); });
-      }, [page, refresh]);
+      }
+
+      useEffect(() => { load(); }, [page, refresh]);
+      useEffect(() => {
+        const t = setInterval(load, 2000);
+        return () => clearInterval(t);
+      }, [page]);
 
       return h('div', null,
         h('h2', null, 'Published Posts'),
@@ -154,6 +177,60 @@
       );
     }
 
+    function RejectedList({ refresh }) {
+      const [posts, setPosts] = useState([]);
+      const [now, setNow] = useState(Date.now());
+
+      function load() {
+        fetch('/posts/rejected').then(r => r.json()).then(setPosts).catch(() => setPosts([]));
+      }
+
+      useEffect(() => { load(); }, [refresh]);
+      useEffect(() => {
+        const t = setInterval(() => { load(); setNow(Date.now()); }, 10000);
+        return () => clearInterval(t);
+      }, []);
+
+      function canDelete(post) {
+        return (now - new Date(post.timestamp).getTime()) >= 24 * 60 * 60 * 1000;
+      }
+
+      function timeUntilDeletion(post) {
+        const ms = 24 * 60 * 60 * 1000 - (now - new Date(post.timestamp).getTime());
+        if (ms <= 0) return null;
+        const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000);
+        return `deletable in ${h}h ${m}m`;
+      }
+
+      function deletePost(id) {
+        fetch(`/posts/${id}`, { method: 'DELETE' }).then(r => { if (r.ok || r.status === 204) load(); });
+      }
+
+      return h('div', null,
+        h('h2', null, `Auto-Rejected Posts (${posts.length})`),
+        posts.length === 0
+          ? h('p', { style: { color: '#999' } }, 'No auto-rejected posts.')
+          : posts.map(p =>
+              h('div', { className: 'rejected-post', key: p.id },
+                h('div', { className: 'meta' },
+                  h('strong', null, p.author), ` · ${new Date(p.timestamp).toLocaleString()}`,
+                  p.aiScore != null && h('span', { style: { marginLeft: '0.5rem', color: '#c0392b' } }, `score: ${p.aiScore.toFixed(1)}`)
+                ),
+                h('div', { className: 'content' }, p.content),
+                p.aiReason && h('div', { style: { fontSize: '0.8rem', color: '#888', marginTop: '0.2rem' } }, p.aiReason),
+                h('div', { className: 'controls' },
+                  h('button', {
+                    className: 'btn-delete',
+                    disabled: !canDelete(p),
+                    onClick: () => deletePost(p.id)
+                  }, '🗑 Delete'),
+                  !canDelete(p) && h('span', { className: 'delete-hint' }, timeUntilDeletion(p))
+                )
+              )
+            )
+      );
+    }
+
     function App() {
       const [tick, setTick] = useState(0);
       const refresh = () => setTick(t => t + 1);
@@ -162,6 +239,7 @@
         h('h1', null, 'Social Network'),
         h(NewPostForm, { onCreated: refresh }),
         h(ModerationQueue, { refresh: tick, onAction: refresh }),
+        h(RejectedList, { refresh: tick }),
         h(Feed, { refresh: tick })
       );
     }

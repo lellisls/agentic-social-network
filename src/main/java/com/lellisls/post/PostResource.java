@@ -9,6 +9,7 @@ import io.cloudevents.jackson.JsonCloudEventData;
 import io.smallrye.common.annotation.Blocking;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.transaction.Transactional;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -66,6 +67,26 @@ public class PostResource {
         // Start workflow asynchronously
         workflowInstance.start();
         return Response.status(Response.Status.ACCEPTED).entity(post).build();
+    }
+
+    @GET
+    @Path("/rejected")
+    public List<Post> rejected() {
+        return Post.find("status = ?1 ORDER BY timestamp DESC", Post.Status.REJECTED).list();
+    }
+
+    @DELETE
+    @Path("/{id}")
+    @Transactional
+    public Response delete(@PathParam("id") long id) {
+        Post post = Post.findById(id);
+        if (post == null) return Response.status(Response.Status.NOT_FOUND).build();
+        if (post.status != Post.Status.REJECTED) return Response.status(Response.Status.CONFLICT).build();
+        if (post.timestamp.isAfter(java.time.Instant.now().minus(1, java.time.temporal.ChronoUnit.DAYS)))
+            return Response.status(Response.Status.FORBIDDEN)
+                    .entity(Map.of("error", "Post can only be deleted after 24 hours")).build();
+        post.delete();
+        return Response.noContent().build();
     }
 
     public record HumanDecision(boolean approved) {}

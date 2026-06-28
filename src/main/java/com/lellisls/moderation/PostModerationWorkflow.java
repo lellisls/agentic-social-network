@@ -5,6 +5,7 @@ import com.lellisls.post.Post;
 import io.cloudevents.CloudEvent;
 import io.cloudevents.CloudEventData;
 import io.quarkiverse.flow.Flow;
+import io.serverlessworkflow.api.types.FlowDirectiveEnum;
 import io.serverlessworkflow.api.types.Workflow;
 import io.serverlessworkflow.fluent.func.FuncWorkflowBuilder;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -28,23 +29,31 @@ public class PostModerationWorkflow extends Flow {
     public Workflow descriptor() {
         return FuncWorkflowBuilder.workflow("post-moderation")
                 .tasks(
-                        // Step 1: AI moderation, preserving the post id for later DB updates.
+                        // Step 1: AI moderation
                         function("aiModerate", this::moderate, PostContext.class, ModerationContext.class),
 
-                        // Step 2: branch on AI decision
+                        // Step 2a: auto-approve branch (score < 25)
                         switchWhenOrElse(
-                                (ModerationContext ctx) -> !ctx.approved(),
-                                "markRejected",
-                                "markPendingHuman",
-                                ModerationContext.class),
+                                (ModerationContext ctx) -> ctx.decision() == ModerationPanel.Decision.AUTO_APPROVE,
+                                "markPublished", "checkAutoReject", ModerationContext.class),
 
-                        // Step 3a: AI rejected — update DB and end
-                        consume("markRejected", this::markRejected, ModerationContext.class),
+                        // Step 2a-result: published → end
+                        consume("markPublished", this::markPublished, ModerationContext.class)
+                                .then(FlowDirectiveEnum.END),
 
-                        // Step 3b: AI approved — update DB and wait for human
+                        // Step 2b: auto-reject branch (score > 90)
+                        switchWhenOrElse("checkAutoReject",
+                                (ModerationContext ctx) -> ctx.decision() == ModerationPanel.Decision.AUTO_REJECT,
+                                "markRejected", "markPendingHuman", ModerationContext.class),
+
+                        // Step 2b-result: rejected → end
+                        consume("markRejected", this::markRejected, ModerationContext.class)
+                                .then(FlowDirectiveEnum.END),
+
+                        // Step 3: 25-90 — wait for human
                         consume("markPendingHuman", this::markPendingHuman, ModerationContext.class),
 
-                        // Step 4: pause until human review event with the same postId arrives.
+                        // Step 4: pause until human review event
                         listen("waitHumanReview",
                                 toOne(consumed("post.human.review.done")
                                         .correlate("postId", c -> c
@@ -59,12 +68,12 @@ public class PostModerationWorkflow extends Flow {
     }
 
     public record PostContext(long postId, String author, String content) {}
-    public record ModerationContext(long postId, boolean approved, String reason) {}
+    public record ModerationContext(long postId, ModerationPanel.Decision decision, double score, String reason) {}
     public record HumanReviewDecision(long postId, boolean approved) {}
 
     ModerationContext moderate(PostContext ctx) {
         ModerationPanel.Verdict verdict = moderationPanel.evaluate(ctx.author(), ctx.content());
-        return new ModerationContext(ctx.postId(), verdict.approved(), verdict.reason());
+        return new ModerationContext(ctx.postId(), verdict.decision(), verdict.score(), verdict.reason());
     }
 
     HumanReviewDecision toHumanReviewDecision(Collection<?> events) {
@@ -95,11 +104,23 @@ public class PostModerationWorkflow extends Flow {
     }
 
     @Transactional
+    void markPublished(ModerationContext ctx) {
+        Post post = Post.findById(ctx.postId());
+        if (post != null) {
+            post.status = Post.Status.PUBLISHED;
+            post.aiApproved = true;
+            post.aiScore = ctx.score();
+            post.aiReason = ctx.reason();
+        }
+    }
+
+    @Transactional
     void markRejected(ModerationContext ctx) {
         Post post = Post.findById(ctx.postId());
         if (post != null) {
             post.status = Post.Status.REJECTED;
-            post.aiApproved = ctx.approved();
+            post.aiApproved = false;
+            post.aiScore = ctx.score();
             post.aiReason = ctx.reason();
         }
     }
@@ -109,7 +130,8 @@ public class PostModerationWorkflow extends Flow {
         Post post = Post.findById(ctx.postId());
         if (post != null) {
             post.status = Post.Status.PENDING_HUMAN;
-            post.aiApproved = ctx.approved();
+            post.aiApproved = null;
+            post.aiScore = ctx.score();
             post.aiReason = ctx.reason();
         }
     }

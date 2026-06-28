@@ -6,16 +6,23 @@ import jakarta.inject.Inject;
 @ApplicationScoped
 public class ModerationPanel {
 
-    private static final double REJECTION_THRESHOLD = 60.0;
+    private static final double AUTO_APPROVE_THRESHOLD = 25.0;
+    private static final double AUTO_REJECT_THRESHOLD  = 90.0;
 
     @Inject
     ModerationPlanner planner;
 
     public Verdict evaluate(String author, String content) {
         EvaluationResult result = planner.vote(author, content);
-        boolean approved = result.score() < REJECTION_THRESHOLD;
-        return new Verdict(approved, result.reason());
+        double score = result.score();
+        Decision decision = score < AUTO_APPROVE_THRESHOLD ? Decision.AUTO_APPROVE
+                          : score > AUTO_REJECT_THRESHOLD  ? Decision.AUTO_REJECT
+                          : Decision.NEEDS_HUMAN;
+        return new Verdict(decision, score, result.reason());
     }
 
-    public record Verdict(boolean approved, String reason) {}
+    public enum Decision { AUTO_APPROVE, NEEDS_HUMAN, AUTO_REJECT }
+    public record Verdict(Decision decision, double score, String reason) {
+        public boolean approved() { return decision != Decision.AUTO_REJECT; }
+    }
 }
